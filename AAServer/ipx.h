@@ -66,7 +66,13 @@
 #endif
 
 // For Uint8 type
+#if defined(TARGET_UNIX) && defined(AA_REAL_SDL12)
+#include <SDL_net.h>
+#elif defined(TARGET_UNIX)
+#include <SDL2/SDL_net.h>
+#else
 #include "SDL_net.h"
+#endif
 
 struct PackedIP {
 	Uint32 host;

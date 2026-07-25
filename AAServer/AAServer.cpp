@@ -1,14 +1,28 @@
 // AAServer.cpp : Defines the entry point for the console application.
 //
 
+#ifdef TARGET_UNIX
+#include <stdio.h>
+#else
 #include "stdafx.h"
-#include "config.h"
 #include <windows.h>
+#endif
+#include "config.h"
 #include "ipxserver.h"
 #include <stdlib.h>
 #include <string.h>
 #include "ipx.h"
 #include <time.h>
+#if defined(TARGET_UNIX) && defined(AA_REAL_SDL12)
+/* Real SDL 1.2 (e.g. Tigerbrew on PPC/Tiger, Nekoware on IRIX) installs
+   headers at the classic bare path, not namespaced under SDL2/ like
+   Homebrew's sdl12-compat + SDL2 combo on modern macOS. */
+#include <SDL.h>
+#elif defined(TARGET_UNIX)
+#include <SDL2/SDL.h>
+#else
+#include "SDL.h"
+#endif
 extern "C" {
 void PacketPrint(void *aData, unsigned int aSize);
 }
@@ -333,7 +347,7 @@ bool IPX_StartServer(Bit16u portnum)
                 // 1 second has gone by
                 UpdateConnections();
             }
-            Sleep(1);
+            SDL_Delay(1);
         }
 
         return true;
@@ -343,7 +357,11 @@ bool IPX_StartServer(Bit16u portnum)
     return false;
 }
 
+#ifdef TARGET_UNIX
+int main(int argc, char *argv[])
+#else
 int _tmain(int argc, _TCHAR* argv[])
+#endif
 {
     printf("Amulets & Armor IPX Server v1.00\n");
     printf("--------------------------------\n");

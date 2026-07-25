@@ -18,6 +18,7 @@
 /* Flag that determines if this is the shareware version */
 //#define COMPILE_OPTION_SHAREWARE_DEMO
 #define COMPILE_OPTION_CLASSIC_VERSION
+//#define COMPILE_OPTION_CLASSIC_DEV_VERSION
 
 /* Flag to turn off the frames per second. */
 //#define COMPILE_OPTION_FRAME_SPEED_OFF
@@ -52,6 +53,9 @@
 // Option to record all creature movement to ensure syncronized actions
 //#define COMPILE_OPTION_CREATE_CRELOGIC_DATA_FILE
 
+// Option to record detailed player attack diagnostics for hit/miss tracing
+//#define COMPILE_OPTION_CREATE_ATTACK_TRACE_FILE
+
 // Option to turn on indicator lights that show different
 // areas of program execution
 // Indicators go from left to right as follows:
@@ -75,7 +79,9 @@
 #ifdef COMPILE_OPTION_SHAREWARE_DEMO
     #define VERSION_TEXT "Shareware Demo V1.2"
 #elif defined(COMPILE_OPTION_CLASSIC_VERSION)
-    #define VERSION_TEXT "Classic V1.01"
+    #define VERSION_TEXT "Classic V1.05.03a"
+#elif defined(COMPILE_OPTION_CLASSIC_DEV_VERSION)
+    #define VERSION_TEXT "Classic Dev V1.05.03a"
 #else
     #define VERSION_TEXT "Registered V1.0"
 #endif
@@ -181,7 +187,9 @@
 	#define __far
 	#define __near
 	#define COMPILE_OPTION_DIRECT_TALK_IS_DOS32
-	#define WIN_IPX		 1 // off
+	#ifndef WIN_IPX
+		#define WIN_IPX		 1 // off
+	#endif
 #else
 	#define COMPILE_OPTION_DIRECT_TALK_IS_DOS32
 #endif

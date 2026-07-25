@@ -1,0 +1,19 @@
+# Build outputs. Local CMake builds must use -B out (not -B build) --
+# on case-insensitive filesystems (default macOS APFS), "build" and "Build"
+# (the tracked cross-compile script directory below) are the same path.
+/out/
+/Build/MacOSX-PPC/build/
+/Build/IRIX-O2/build/
+
+# Native binaries built locally for release packaging -- these ship as
+# GitHub Release assets, not committed into the tree.
+/dist/
+
+# CMake/Ninja outputs if generated at repo root
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/build.ninja
+/.ninja_deps
+/.ninja_log
+/compile_commands.json

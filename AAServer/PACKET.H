@@ -6,7 +6,7 @@
 
 #include "GENERAL.H"
 #include "GROUP.H"
-//#include "VIEWFILE.H"
+// VIEWFILE.H intentionally not vendored -- PACKET.H uses nothing from it (verified: PACKET.H compiles standalone without it). See mac/README.md.
 
 /* ------------------------------------------------------------------------ */
 
@@ -108,20 +108,20 @@ typedef T_byte8 E_changePasswordStatus ;
 /* ------------------------------------------------------------------------ */
 
 typedef struct {
-    T_byte8 command ;
-    T_byte8 fromPlayer ;
-    T_byte8 toPlayer ;
-    T_byte8 transmitStart ;
-    T_gameGroupID groupID ;
+    T_byte8 command              PACK ;
+    T_byte8 fromPlayer            PACK ;
+    T_byte8 toPlayer              PACK ;
+    T_byte8 transmitStart         PACK ;
+    T_gameGroupID groupID         PACK ;
 } T_retransmitPacket ;
 
 /* ------------------------------------------------------------------------ */
 
 /* Packet for town ui messages. */
 typedef struct {
-    T_byte8 command ;
-    T_byte8 name[30] ;
-    T_byte8 msg[40] ;
+    T_byte8 command               PACK ;
+    T_byte8 name[30]               PACK ;
+    T_byte8 msg[40]                PACK ;
 } T_townUIMessagePacket ;
 
 /* ------------------------------------------------------------------------ */
@@ -139,27 +139,30 @@ typedef T_byte8 T_playerIDState ;
 #define PLAYER_ID_STATE_JOINING_GAME         2
 #define PLAYER_ID_STATE_UNKNOWN              3
 
-typedef struct { //46 bytes
-    T_byte8 name[30] ;
-    T_directTalkUniqueAddress uniqueAddress ;
-    T_playerIDLocation location ;
-    T_playerIDState state ;
-    T_gameGroupID groupID ;
-    T_word16 adventure ;
+typedef struct { //50 bytes
+    T_byte8 name[30]                      PACK ;
+    T_directTalkUniqueAddress uniqueAddress PACK ;
+    T_playerIDLocation location            PACK ;
+    T_playerIDState state                  PACK ;
+    T_gameGroupID groupID                  PACK ;
+    T_word16 adventure                     PACK ;
+	T_word16 quest                          PACK ;
+	T_byte8 classType                       PACK ;
+	T_byte8 level                           PACK ;
 } T_playerIDSelf ;
 
 typedef struct {
-    T_byte8 command ;
-    T_playerIDSelf id ;
+    T_byte8 command             PACK ;
+    T_playerIDSelf id            PACK ;
 } T_playerIDSelfPacket ;
 
 /* ------------------------------------------------------------------------ */
 
 typedef struct {
-    T_byte8 command ;
-    T_directTalkUniqueAddress uniqueAddress ;
-    T_gameGroupID groupID ;
-    T_word16 adventure ;
+    T_byte8 command                        PACK ;
+    T_directTalkUniqueAddress uniqueAddress PACK ;
+    T_gameGroupID groupID                   PACK ;
+    T_word16 adventure                      PACK ;
 } T_gameRequestJoinPacket ;
 
 /* ------------------------------------------------------------------------ */
@@ -171,31 +174,31 @@ typedef T_byte8 E_respondJoin ;
 #define GAME_RESPOND_JOIN_UNKNOWN    3
 
 typedef struct {
-    T_byte8 command ;
-    T_directTalkUniqueAddress uniqueAddress ;
-    T_gameGroupID groupID ;
-    T_word16 adventure ;
-    E_respondJoin response ;
+    T_byte8 command                        PACK ;
+    T_directTalkUniqueAddress uniqueAddress PACK ;
+    T_gameGroupID groupID                   PACK ;
+    T_word16 adventure                      PACK ;
+    E_respondJoin response                  PACK ;
 } T_gameRespondJoinPacket ;
 
 /* ------------------------------------------------------------------------ */
 
 typedef struct {
-    T_byte8 command ;
-    T_gameGroupID groupID ;
-    T_word16 adventure ;
-    T_byte8 numPlayers ;
-    T_directTalkUniqueAddress players[4] ;
-    T_word32 timeOfDay ;
-    T_word16 firstLevel ;
+    T_byte8 command                  PACK ;
+    T_gameGroupID groupID             PACK ;
+    T_word16 adventure                PACK ;
+    T_byte8 numPlayers                PACK ;
+    T_directTalkUniqueAddress players[4] PACK ;
+    T_word32 timeOfDay                PACK ;
+    T_word16 firstLevel               PACK ;
 } T_gameStartPacket ;
 
 /* ------------------------------------------------------------------------ */
 
 typedef struct {
-	T_byte8 command;
-	T_byte8 commandBeingAcked;
-	T_word32 packetIDBeingAcked; 
+	T_byte8 command                PACK;
+	T_byte8 commandBeingAcked      PACK;
+	T_word32 packetIDBeingAcked    PACK;
 } T_ackPacket;
 
 #endif

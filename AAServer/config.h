@@ -1,15 +1,19 @@
 #ifndef _AASERVER_CONFIG_H_
 #define _AASERVER_CONFIG_H_
 
+#ifdef TARGET_UNIX
+#define GCC_ATTRIBUTE(x) __attribute__((x))
+#else
 #define GCC_ATTRIBUTE(x) /* attribute not supported */
+#endif
 #define GCC_UNLIKELY(x) (x)
 #define GCC_LIKELY(x) (x)
 
 #define INLINE __forceinline
 #define DB_FASTCALL __fastcall
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1400) 
-#pragma warning(disable : 4996) 
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#pragma warning(disable : 4996)
 #endif
 
 
@@ -20,8 +24,13 @@ typedef unsigned short		Bit16u;
 typedef   signed short		Bit16s;
 typedef  unsigned long		Bit32u;
 typedef    signed long		Bit32s;
+#ifdef TARGET_UNIX
+typedef unsigned long long	Bit64u;
+typedef   signed long long	Bit64s;
+#else
 typedef unsigned __int64	Bit64u;
 typedef   signed __int64	Bit64s;
+#endif
 typedef unsigned int		Bitu;
 typedef signed int			Bits;
 
