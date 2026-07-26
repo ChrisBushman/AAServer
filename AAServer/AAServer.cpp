@@ -378,11 +378,23 @@ int _tmain(int argc, _TCHAR* argv[])
 
     Bit16u port = DEFAULT_IPX_PORT;
     if (argc >= 2) {
+#ifdef TARGET_UNIX
         int parsed = atoi(argv[1]);
+#else
+        /* argv[1] is _TCHAR* here, which is wchar_t* under this project's
+           Windows Unicode builds -- atoi() only accepts char*. _ttoi is
+           tchar.h's width-agnostic equivalent (expands to _wtoi/atoi to
+           match). */
+        int parsed = _ttoi(argv[1]);
+#endif
         if (parsed > 0 && parsed <= 65535) {
             port = (Bit16u)parsed;
         } else {
+#ifdef TARGET_UNIX
             printf("Invalid port '%s', using default %d\n", argv[1], DEFAULT_IPX_PORT);
+#else
+            _tprintf(_T("Invalid port '%s', using default %d\n"), argv[1], DEFAULT_IPX_PORT);
+#endif
         }
     }
 
