@@ -14,6 +14,12 @@ struct packetBuffer {
     unsigned int timeout;
 };
 
+/* Historically 213 (the DOSBox IPX-tunnel convention), but that's a
+   privileged port on Unix-like systems (macOS/Tiger/IRIX all require
+   root to bind < 1024) -- moved to an unprivileged default so the
+   server/launcher never need su/sudo. Still overridable via argv[1]. */
+#define DEFAULT_IPX_PORT 21300
+
 #define SOCKETTABLESIZE 256
 #define CONVIP(hostvar) hostvar & 0xff, (hostvar >> 8) & 0xff, (hostvar >> 16) & 0xff, (hostvar >> 24) & 0xff
 #define CONVIPX(hostvar) hostvar[0], hostvar[1], hostvar[2], hostvar[3], hostvar[4], hostvar[5]

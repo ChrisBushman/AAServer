@@ -376,7 +376,17 @@ int _tmain(int argc, _TCHAR* argv[])
         exit(2);
     }
 
-    IPX_StartServer(213);
+    Bit16u port = DEFAULT_IPX_PORT;
+    if (argc >= 2) {
+        int parsed = atoi(argv[1]);
+        if (parsed > 0 && parsed <= 65535) {
+            port = (Bit16u)parsed;
+        } else {
+            printf("Invalid port '%s', using default %d\n", argv[1], DEFAULT_IPX_PORT);
+        }
+    }
+
+    IPX_StartServer(port);
     return 0;
 }
 
