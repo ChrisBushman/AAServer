@@ -30,6 +30,8 @@ void PacketPrint(void *aData, unsigned int aSize);
 #define CONNECT_TIMEOUT     900 // seconds
 IPaddress ipxServerIp;  // IPAddress for server's listening port
 UDPsocket ipxServerSocket;  // Listening server socket
+UDPsocket discoverySocket;  // LAN-discovery responder socket (see DiscoveryServerLoop)
+static Bit16u g_serverPort;  // portnum as passed to IPX_StartServer, host byte order
 
 #define DEBUG_PACKETS 0
 
@@ -297,6 +299,61 @@ void IPX_StopServer()
 {
     //TIMER_DelTickHandler(&IPX_ServerLoop);
     SDLNet_UDP_Close(ipxServerSocket);
+    if (discoverySocket) {
+        SDLNet_UDP_Close(discoverySocket);
+    }
+}
+
+/* Answers LAN "is anybody there" probes from a launcher's Join dialog, on
+   a fixed well-known port separate from the (user-configurable) game port
+   -- see DEFAULT_DISCOVERY_PORT. Polled once per main-loop iteration,
+   same non-blocking-recv pattern as IPX_ServerLoop. Replies directly to
+   the sender's address (from inPacket.address) rather than broadcasting,
+   so it works the same whether the probe arrived via broadcast or unicast. */
+void DiscoveryServerLoop(void)
+{
+    static Bit8u discoveryBuffer[64];
+    UDPpacket inPacket;
+    UDPpacket outPacket;
+    char reply[64];
+    int replyLen;
+    size_t magicLen = strlen(DISCOVERY_REQUEST_MAGIC);
+
+    if (!discoverySocket)
+        return;
+
+    inPacket.channel = -1;
+    inPacket.data = discoveryBuffer;
+    inPacket.maxlen = sizeof(discoveryBuffer) - 1;
+
+    if (SDLNet_UDP_Recv(discoverySocket, &inPacket) <= 0)
+        return;
+
+    if ((size_t)inPacket.len < magicLen)
+        return;
+    discoveryBuffer[inPacket.len] = '\0';
+    if (strncmp((char *)discoveryBuffer, DISCOVERY_REQUEST_MAGIC, magicLen) != 0)
+        return;
+
+    /* "AAServer" as a fixed display name, not a real gethostname() lookup --
+       keeps this responder free of any extra platform-specific networking
+       headers/init (Winsock's gethostname() needs care around WSAStartup
+       ordering that isn't worth adding just for a cosmetic label). Users
+       can give a server a friendlier name on the client side when saving
+       it to their own server list. */
+    /* sprintf, not snprintf -- this ancient IRIX/TGCware GCC toolchain
+       doesn't declare snprintf under this build's flags (-U__c99), and
+       every other string-formatting call in this codebase already uses
+       sprintf. Safe here: reply is 64 bytes, and the formatted content
+       (a 14-char prefix, a 16-bit port's up to 5 digits, and the fixed
+       string ":AAServer") tops out well under 30. */
+    replyLen = sprintf(reply, "%s%d:AAServer", DISCOVERY_REPLY_PREFIX, (int)g_serverPort);
+
+    outPacket.channel = -1;
+    outPacket.data = (Bit8u *)reply;
+    outPacket.len = replyLen;
+    outPacket.address = inPacket.address;
+    SDLNet_UDP_Send(discoverySocket, -1, &outPacket);
 }
 
 void UpdateConnections(void)
@@ -331,6 +388,16 @@ bool IPX_StartServer(Bit16u portnum)
             printf("Failed to create server socket: %s\n", SDLNet_GetError());
             return false;
         }
+        g_serverPort = portnum;
+
+        /* Non-fatal if this can't be opened (e.g. another AAServer already
+           running on this machine has it) -- LAN discovery is a convenience
+           for the Join dialog, not required to host/join a game directly by
+           IP, so the whole server shouldn't refuse to start over it. */
+        discoverySocket = SDLNet_UDP_Open(DEFAULT_DISCOVERY_PORT);
+        if (!discoverySocket) {
+            printf("Warning: LAN discovery responder unavailable (%s) -- server will only be joinable by direct IP.\n", SDLNet_GetError());
+        }
 
         for (i = 0; i < SOCKETTABLESIZE; i++) {
             connBuffer[i].connected = false;
@@ -341,6 +408,7 @@ bool IPX_StartServer(Bit16u portnum)
         lastCheck = clock();
         while (1) {
             IPX_ServerLoop();
+            DiscoveryServerLoop();
             t = clock();
             if ((t - lastCheck) >= CLOCKS_PER_SEC) {
                 lastCheck += CLOCKS_PER_SEC;
