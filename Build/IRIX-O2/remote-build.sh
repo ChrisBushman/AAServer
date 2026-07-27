@@ -41,6 +41,7 @@ TAR_EXCLUDES=(
     --exclude='out'
     --exclude='Build/MacOSX-PPC/build'
     --exclude='Build/IRIX-O2/build'
+    --exclude='dist'
 )
 
 echo "==> Syncing $REPO_ROOT to $AA_O2_HOST:$REMOTE_PATH"
