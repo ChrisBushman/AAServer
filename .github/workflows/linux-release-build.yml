@@ -1,0 +1,47 @@
+name: Linux release build
+
+# One-off/manual build for release packaging, not a permanent CI gate --
+# same role as windows-release-build.yml, but for the native Linux CMake
+# path (top-level CMakeLists.txt's UNIX branch). Triggered by hand from
+# the Actions tab or `gh workflow run linux-release-build.yml`.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libsdl1.2-dev libsdl2-net-dev
+
+      - name: Configure
+        run: cmake -S . -B out/linux -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build AAServer
+        run: cmake --build out/linux --target AAServer -j
+
+      # lib/ bundles the SDL runtime libs (found via the $ORIGIN/lib rpath
+      # set in CMakeLists.txt) so the release doesn't require sdl12-compat/
+      # SDL2_net preinstalled -- see the matching comment in AmuletsArmor's
+      # own linux-release-build.yml for why only libSDL* gets bundled.
+      - name: Package release archive
+        run: |
+          STAGE=AAServer-Linux
+          mkdir -p "$STAGE/lib"
+          cp out/linux/AAServer "$STAGE/"
+          chmod +x "$STAGE/AAServer"
+          for lib in $(ldd out/linux/AAServer | awk '/libSDL/ {print $3}'); do
+            cp -L "$lib" "$STAGE/lib/"
+          done
+          tar czf AAServer-Linux.tar.gz "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AAServer-Linux
+          path: AAServer-Linux.tar.gz
+          if-no-files-found: error
