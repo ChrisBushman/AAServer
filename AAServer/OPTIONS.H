@@ -199,7 +199,12 @@
 #pragma warning(disable:4100)
 //#include <windows.h>
 //#include <direct.h>
-#include <sdl.h>
+/* Win9x port: lowercase <sdl.h> only ever resolved by luck of a
+   case-insensitive filesystem (real Windows, default macOS) -- the real
+   vendored file is SDL.h. Never surfaced before this port's Linux-hosted
+   mingw cross-compile (the only case-sensitive host this codebase has
+   built AAServer's Windows path on). */
+#include <SDL.h>
 // Delay in a number of milliseconds to delay
 #define delay(x) if (x < 14) { SDL_Delay(14); } else { SDL_Delay(x); }
 /* The mouse driver is handled not in the mouse calls, but in the file 'winmouse.c' */
