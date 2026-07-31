@@ -1,0 +1,51 @@
+name: macOS release build
+
+# One-off/manual build for release packaging, not a permanent CI gate --
+# same role as linux-release-build.yml/windows-release-build.yml, but for
+# the native macOS CMake path (top-level CMakeLists.txt's APPLE branch).
+# Triggered by hand from the Actions tab or
+# `gh workflow run macos-release-build.yml`.
+#
+# GitHub's macos-latest runners are Apple Silicon (Homebrew at
+# /opt/homebrew) -- CMakeLists.txt's post-build step rewrites AAServer's
+# SDL dylib references to @executable_path/lib/... and bundles the real
+# .dylib files alongside the binary (see Build/macos-fix-dylib-paths.cmake),
+# so the resulting archive is self-contained and isn't tied to that
+# prefix or to Homebrew being installed at all on whoever runs it.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: brew install pkg-config sdl12-compat sdl2_net
+
+      - name: Configure
+        run: cmake -S . -B out/macos -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build AAServer
+        run: cmake --build out/macos --target AAServer -j
+
+      # lib/ is already populated by CMakeLists.txt's APPLE post-build step
+      # (Build/macos-fix-dylib-paths.cmake), which also rewrites AAServer's
+      # own dylib references to point at it via @executable_path.
+      - name: Package release archive
+        run: |
+          STAGE=AAServer-macOS
+          mkdir -p "$STAGE"
+          cp out/macos/AAServer "$STAGE/"
+          cp -R out/macos/lib "$STAGE/lib"
+          chmod +x "$STAGE/AAServer"
+          cp Build/AAServer.command "$STAGE/AAServer.command"
+          chmod +x "$STAGE/AAServer.command"
+          ditto -c -k --sequesterRsrc --keepParent "$STAGE" AAServer-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AAServer-macOS
+          path: AAServer-macOS.zip
+          if-no-files-found: error

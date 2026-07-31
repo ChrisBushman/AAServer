@@ -3,6 +3,12 @@
 
 #ifdef TARGET_UNIX
 #include <stdio.h>
+#include <unistd.h>
+#include <string>
+#include <vector>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #else
 #include "stdafx.h"
 #include <windows.h>
@@ -426,11 +432,149 @@ bool IPX_StartServer(Bit16u portnum)
 }
 
 #ifdef TARGET_UNIX
+/* Guard env var: set on the relaunched copy before it execs into a
+   terminal, so that copy (which still sees --console, if the caller left
+   it in) never tries to relaunch itself again. */
+#define CONSOLE_SPAWNED_ENV "AASERVER_CONSOLE_SPAWNED"
+
+static std::string ShellQuoteArg(const char *s)
+{
+    std::string out = "'";
+    for (const char *p = s; *p; p++) {
+        if (*p == '\'')
+            out += "'\\''";
+        else
+            out += *p;
+    }
+    out += "'";
+    return out;
+}
+
+static bool ResolveExecutablePath(char *outPath, size_t outSize)
+{
+#ifdef __APPLE__
+    char rawPath[4096];
+    uint32_t rawSize = sizeof(rawPath);
+    if (_NSGetExecutablePath(rawPath, &rawSize) != 0)
+        return false;
+    return realpath(rawPath, outPath) != NULL;
+#else
+    ssize_t len = readlink("/proc/self/exe", outPath, outSize - 1);
+    if (len <= 0)
+        return false;
+    outPath[len] = '\0';
+    return true;
+#endif
+}
+
+/* Re-launches this same binary inside a new, visible terminal window, for
+   use when AAServer has no controlling tty of its own -- e.g. double-
+   clicked in Finder, or spawned as a fully detached child the way
+   AALauncher's "Start Server" button does (QProcess::startDetached() on
+   Qt builds, NSTask on the Cocoa/PPC build), neither of which leaves it
+   with any visible output or window. Opt-in via --console rather than
+   automatic: a real dedicated-server deployment (systemd, Docker, plain
+   SSH+nohup) legitimately wants to run with no tty, and unconditionally
+   forcing a terminal open would break that. Only reached under
+   TARGET_UNIX -- the native Windows build already gets a console for
+   free via its Console subsystem linker setting. */
+static bool SpawnInTerminal(int argc, char **argv)
+{
+    char exePath[4096];
+    if (!ResolveExecutablePath(exePath, sizeof(exePath)))
+        return false;
+
+    std::string cmd = ShellQuoteArg(exePath);
+    for (int i = 1; i < argc; i++) {
+        cmd += " ";
+        cmd += ShellQuoteArg(argv[i]);
+    }
+
+    setenv(CONSOLE_SPAWNED_ENV, "1", 1);
+
+#ifdef __APPLE__
+    /* Terminal.app's "do script" runs the given string through the user's
+       shell in a new window, so cmd (already shell-quoted per argument)
+       is exactly what belongs here. Escape it for embedding inside the
+       double-quoted AppleScript string literal. */
+    std::string script = "tell application \"Terminal\" to do script \"";
+    for (char c : cmd) {
+        if (c == '"' || c == '\\')
+            script += '\\';
+        script += c;
+    }
+    script += "\"";
+    execlp("osascript", "osascript",
+           "-e", script.c_str(),
+           "-e", "tell application \"Terminal\" to activate",
+           (char *)NULL);
+    return false; // only reached if osascript itself couldn't be exec'd
+#else
+    /* Try common Linux terminal emulators in turn. Each is exec'd as
+       "<emulator> <separator> /bin/sh -c '<cmd>'" so the shell (not the
+       terminal emulator) is what parses cmd's quoting -- avoids relying
+       on each emulator's own argv-vs-single-string -e/-- conventions. */
+    struct { const char *bin; const char *sep; } emulators[] = {
+        {"x-terminal-emulator", "-e"},
+        {"gnome-terminal", "--"},
+        {"konsole", "-e"},
+        {"xfce4-terminal", "-e"},
+        {"xterm", "-e"},
+    };
+    for (size_t i = 0; i < sizeof(emulators) / sizeof(emulators[0]); i++) {
+        execlp(emulators[i].bin, emulators[i].bin, emulators[i].sep,
+               "/bin/sh", "-c", cmd.c_str(), (char *)NULL);
+        // execlp only returns on failure (e.g. emulator not installed);
+        // fall through and try the next one.
+    }
+    return false;
+#endif
+}
+#endif
+
+#ifdef TARGET_UNIX
 int main(int argc, char *argv[])
 #else
 int _tmain(int argc, _TCHAR* argv[])
 #endif
 {
+#ifdef TARGET_UNIX
+    /* Pull --console out of argv before anything else (including the
+       existing positional port-argument parsing below) looks at it. */
+    bool consoleRequested = false;
+    {
+        int w = 1;
+        for (int r = 1; r < argc; r++) {
+            if (strcmp(argv[r], "--console") == 0)
+                consoleRequested = true;
+            else
+                argv[w++] = argv[r];
+        }
+        argc = w;
+    }
+    if (consoleRequested && !getenv(CONSOLE_SPAWNED_ENV)) {
+        if (SpawnInTerminal(argc, argv))
+            return 0; // unreachable: SpawnInTerminal execs on success
+        printf("Warning: --console requested but no terminal emulator could be launched; continuing without one.\n");
+        fflush(stdout);
+    }
+    /* Identify the window/tab for whoever's looking at the process list
+       or a pile of terminal windows, regardless of how it got a tty. */
+    printf("\033]0;AAServer - Amulets & Armor Dedicated Server\007");
+#else
+    /* Accept and ignore --console here too, so callers (e.g. AALauncher)
+       can pass it unconditionally across platforms -- the native Windows
+       build already opens a console window on its own (Console subsystem
+       linker setting), so there's nothing to spawn. */
+    {
+        int w = 1;
+        for (int r = 1; r < argc; r++) {
+            if (_tcscmp(argv[r], _T("--console")) != 0)
+                argv[w++] = argv[r];
+        }
+        argc = w;
+    }
+#endif
     printf("Amulets & Armor IPX Server v1.00\n");
     printf("--------------------------------\n");
     fflush(stdout);

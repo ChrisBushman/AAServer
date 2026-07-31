@@ -38,6 +38,15 @@ jobs:
           for lib in $(ldd out/linux/AAServer | awk '/libSDL/ {print $3}'); do
             cp -L "$lib" "$STAGE/lib/"
           done
+          # Matches the macOS/PPC/IRIX dist packages' own run.sh convention.
+          cat > "$STAGE/run.sh" <<'EOF'
+          #!/bin/sh
+          cd "$(dirname "$0")" || exit 1
+          LD_LIBRARY_PATH="$(pwd)/lib:$LD_LIBRARY_PATH"
+          export LD_LIBRARY_PATH
+          exec ./AAServer "$@"
+          EOF
+          chmod +x "$STAGE/run.sh"
           tar czf AAServer-Linux.tar.gz "$STAGE"
 
       - uses: actions/upload-artifact@v4

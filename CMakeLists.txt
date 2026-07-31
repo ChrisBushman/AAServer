@@ -61,4 +61,26 @@ if(APPLE)
         BUILD_RPATH "${AA_RPATH_DIRS}"
         INSTALL_RPATH "${AA_RPATH_DIRS}"
     )
+
+    # rpath above only helps if the exact Homebrew prefix at build time
+    # (Intel /usr/local vs Apple Silicon /opt/homebrew) also exists on
+    # whatever machine runs the binary -- the SDL deps are actually linked
+    # as hardcoded absolute paths, which dyld loads literally and never
+    # falls back to DYLD_LIBRARY_PATH/rpath for. Rewrite them to
+    # @executable_path/lib/<name> and bundle the real .dylib alongside the
+    # binary so the release archive is genuinely self-contained, matching
+    # the Linux/PPC/IRIX builds' own $ORIGIN/lib convention. See that
+    # script for the full rationale.
+    find_program(AA_OTOOL otool REQUIRED)
+    find_program(AA_INSTALL_NAME_TOOL install_name_tool REQUIRED)
+    find_program(AA_CODESIGN codesign REQUIRED)
+    add_custom_command(TARGET AAServer POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DTARGET_FILE=$<TARGET_FILE:AAServer>
+            -DOTOOL=${AA_OTOOL}
+            -DINSTALL_NAME_TOOL=${AA_INSTALL_NAME_TOOL}
+            -DCODESIGN=${AA_CODESIGN}
+            -P ${CMAKE_SOURCE_DIR}/Build/macos-fix-dylib-paths.cmake
+        COMMENT "Rewriting AAServer's SDL dylib references to @executable_path/lib for portability"
+    )
 endif()
