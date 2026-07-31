@@ -265,11 +265,35 @@ static void IPX_ServerLoop()
         if (SDLNet_Read16(tmpHeader->dest.socket) == 0x2) {
             // Null destination node means its a server registration packet
             if (tmpHeader->dest.addr.byIP.host == 0x0) {
+                /* A registration packet's self-reported src (tmpAddr) is
+                   always zeroed by the client (see ipx_client.cpp's
+                   IBuildRegistrationPacket, shared by both the initial
+                   connect and the periodic keepalive) -- comparing
+                   against it can never match a real ipconn[] entry, so
+                   the old "is this an existing client re-registering"
+                   check below used to be dead code, and every keepalive
+                   round-trip fell through to claiming a brand-new table
+                   slot instead of refreshing its real one. Scan for an
+                   existing match on the actual observed UDP source
+                   (inPacket.address) first, before ever claiming a free
+                   slot as a new connection. */
                 UnpackIP(tmpHeader->src.addr.byIP, &tmpAddr);
+
+                for (i = 0; i < SOCKETTABLESIZE; i++) {
+                    if (connBuffer[i].connected
+                            && (ipconn[i].host == inPacket.address.host)
+                            && (ipconn[i].port == inPacket.address.port)) {
+                        LOG_MSG("IPXSERVER: Reconnect from %d.%d.%d.%d:%d [%d]\n",
+                                CONVIP(inPacket.address.host), inPacket.address.port, i);
+                        fflush(stdout);
+                        connBuffer[i].timeout = CONNECT_TIMEOUT;
+                        ackClient(inPacket.address);
+                        return;
+                    }
+                }
+
                 for (i = 0; i < SOCKETTABLESIZE; i++) {
                     if (!connBuffer[i].connected) {
-                        // Use prefered host IP rather than the reported source IP
-                        // It may be better to use the reported source
                         ipconn[i] = inPacket.address;
 
                         connBuffer[i].connected = true;
@@ -280,19 +304,7 @@ static void IPX_ServerLoop()
                         connBuffer[i].timeout = CONNECT_TIMEOUT;
                         ackClient(inPacket.address);
                         return;
-                    } else {
-                        if ((ipconn[i].host == tmpAddr.host)
-                                && (ipconn[i].port == tmpAddr.port)) {
-
-                            LOG_MSG("IPXSERVER: Reconnect from %d.%d.%d.%d\n",
-                                    CONVIP(tmpAddr.host));
-                            // Update anonymous port number if changed
-                            ipconn[i].port = inPacket.address.port;
-                            ackClient(inPacket.address);
-                            return;
-                        }
                     }
-
                 }
             }
         } else {
