@@ -4,6 +4,13 @@
 #ifdef TARGET_UNIX
 #include <stdio.h>
 #include <unistd.h>
+/* Must precede <string> on IRIX: its libstdc++'s <cwchar> (pulled in
+   transitively by <string>) uses va_list in wchar_core.h without
+   including <cstdarg> itself, so nothing declares va_list unless
+   something upstream already has by the time <string> is reached. Not an
+   issue on macOS/Linux's newer libstdc++/libc++, where <cwchar>/<wchar.h>
+   pull in <cstdarg> themselves. */
+#include <cstdarg>
 #include <string>
 #include <vector>
 #ifdef __APPLE__
@@ -503,7 +510,13 @@ static bool SpawnInTerminal(int argc, char **argv)
         cmd += ShellQuoteArg(argv[i]);
     }
 
-    setenv(CONSOLE_SPAWNED_ENV, "1", 1);
+    /* putenv(), not setenv(): the latter isn't declared by IRIX's stdlib.h
+       without extra BSD-source feature-test macros this project doesn't
+       otherwise need, while putenv() is plain POSIX.1-2001. putenv()
+       doesn't copy its argument, so the buffer must outlive the process
+       (it does -- this is only ever called once, right before an exec). */
+    static char consoleSpawnedEnv[] = CONSOLE_SPAWNED_ENV "=1";
+    putenv(consoleSpawnedEnv);
 
 #ifdef __APPLE__
     /* Terminal.app's "do script" runs the given string through the user's
