@@ -228,6 +228,7 @@ static void ackClient(IPaddress clientAddr)
     PackIP(ipxServerIp, &regHeader.src.addr.byIP);
     SDLNet_Write16(0x2, regHeader.src.socket);
     regHeader.transControl = 0;
+    regHeader.counter = 0; // unused/unvalidated by the client; zeroed rather than left as stack garbage
 
     regPacket.data = (Uint8 *)&regHeader;
     regPacket.len = sizeof(regHeader);

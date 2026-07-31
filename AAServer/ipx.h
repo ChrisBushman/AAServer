@@ -97,6 +97,20 @@ struct IPXHeader {
 		} GCC_ATTRIBUTE(packed) addr;
 		Uint8 socket[2];
 	} dest, src;
+
+	/* Matches AmuletsArmor's Source/Win32/ipx_client.cpp IPXHeader exactly
+	   (that side calls it "ONLY in A&A" and never actually validates it on
+	   receive -- see that file's own comment). Without this trailing
+	   field, every packet this server builds itself (ackClient()'s
+	   registration/reconnect ack -- relayed client packets are untouched,
+	   already the client's own full-size struct) is 4 bytes shorter than
+	   the client's IPXHeader, so the client's IPXClientPoll() rejects it
+	   as "too small" via its own sizeof(IPXHeader) check. The ack still
+	   happens to get through the client's *initial* connect handshake
+	   (which just checks numrecv != 0, not length), but every later
+	   ack -- e.g. a keepalive round-trip -- got silently logged and
+	   dropped. */
+	Uint32 counter;
 } GCC_ATTRIBUTE(packed);
 
 struct fragmentDescriptor {
