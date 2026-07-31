@@ -4,15 +4,6 @@
 #ifdef TARGET_UNIX
 #include <stdio.h>
 #include <unistd.h>
-/* Must precede <string> on IRIX: its libstdc++'s <cwchar> (pulled in
-   transitively by <string>) uses va_list in wchar_core.h without
-   including <cstdarg> itself, so nothing declares va_list unless
-   something upstream already has by the time <string> is reached. Not an
-   issue on macOS/Linux's newer libstdc++/libc++, where <cwchar>/<wchar.h>
-   pull in <cstdarg> themselves. */
-#include <cstdarg>
-#include <string>
-#include <vector>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -457,16 +448,31 @@ bool IPX_StartServer(Bit16u portnum)
    it in) never tries to relaunch itself again. */
 #define CONSOLE_SPAWNED_ENV "AASERVER_CONSOLE_SPAWNED"
 
-static std::string ShellQuoteArg(const char *s)
+/* Plain C, not std::string: linking AAServer.cpp as C++ pulls in
+   libstdc++, whose interaction with pthread static init crashes with
+   SIGSEGV before main() on the TGCware GCC 4.5.2 / IRIX 6.5 toolchain
+   (see Build/IRIX-O2/Makefile's link-rule comment) -- this file has to
+   stay pure C++-frontend-but-no-runtime-features to keep linking as
+   plain C there. Returns a malloc'd buffer the caller owns; every
+   caller here only ever runs once before either exec'ing or returning,
+   so nothing frees these. */
+static char *ShellQuoteArg(const char *s)
 {
-    std::string out = "'";
+    /* Worst case every char is a quote needing 4 bytes ("'\''"), plus the
+       2 wrapping quotes and a NUL. */
+    char *out = (char *)malloc(4 * strlen(s) + 3);
+    char *w = out;
+    *w++ = '\'';
     for (const char *p = s; *p; p++) {
-        if (*p == '\'')
-            out += "'\\''";
-        else
-            out += *p;
+        if (*p == '\'') {
+            memcpy(w, "'\\''", 4);
+            w += 4;
+        } else {
+            *w++ = *p;
+        }
     }
-    out += "'";
+    *w++ = '\'';
+    *w = '\0';
     return out;
 }
 
@@ -504,10 +510,22 @@ static bool SpawnInTerminal(int argc, char **argv)
     if (!ResolveExecutablePath(exePath, sizeof(exePath)))
         return false;
 
-    std::string cmd = ShellQuoteArg(exePath);
+    /* Quote every arg first (each malloc'd), then concatenate space-
+       separated into one malloc'd cmd buffer -- plain C equivalent of
+       the std::string version, see ShellQuoteArg's comment for why. */
+    char **quoted = (char **)malloc(sizeof(char *) * argc);
+    size_t cmdLen = 0;
+    quoted[0] = ShellQuoteArg(exePath);
+    cmdLen = strlen(quoted[0]);
     for (int i = 1; i < argc; i++) {
-        cmd += " ";
-        cmd += ShellQuoteArg(argv[i]);
+        quoted[i] = ShellQuoteArg(argv[i]);
+        cmdLen += 1 + strlen(quoted[i]); // +1 for the separating space
+    }
+    char *cmd = (char *)malloc(cmdLen + 1);
+    strcpy(cmd, quoted[0]);
+    for (int i = 1; i < argc; i++) {
+        strcat(cmd, " ");
+        strcat(cmd, quoted[i]);
     }
 
     /* putenv(), not setenv(): the latter isn't declared by IRIX's stdlib.h
@@ -522,16 +540,23 @@ static bool SpawnInTerminal(int argc, char **argv)
     /* Terminal.app's "do script" runs the given string through the user's
        shell in a new window, so cmd (already shell-quoted per argument)
        is exactly what belongs here. Escape it for embedding inside the
-       double-quoted AppleScript string literal. */
-    std::string script = "tell application \"Terminal\" to do script \"";
-    for (char c : cmd) {
-        if (c == '"' || c == '\\')
-            script += '\\';
-        script += c;
+       double-quoted AppleScript string literal -- worst case every char
+       needs a backslash, plus the wrapping text and NUL. */
+    char *script = (char *)malloc(strlen("tell application \"Terminal\" to do script \"")
+            + 2 * strlen(cmd) + 1 + 1);
+    strcpy(script, "tell application \"Terminal\" to do script \"");
+    {
+        char *w = script + strlen(script);
+        for (const char *p = cmd; *p; p++) {
+            if (*p == '"' || *p == '\\')
+                *w++ = '\\';
+            *w++ = *p;
+        }
+        *w++ = '"';
+        *w = '\0';
     }
-    script += "\"";
     execlp("osascript", "osascript",
-           "-e", script.c_str(),
+           "-e", script,
            "-e", "tell application \"Terminal\" to activate",
            (char *)NULL);
     return false; // only reached if osascript itself couldn't be exec'd
@@ -549,7 +574,7 @@ static bool SpawnInTerminal(int argc, char **argv)
     };
     for (size_t i = 0; i < sizeof(emulators) / sizeof(emulators[0]); i++) {
         execlp(emulators[i].bin, emulators[i].bin, emulators[i].sep,
-               "/bin/sh", "-c", cmd.c_str(), (char *)NULL);
+               "/bin/sh", "-c", cmd, (char *)NULL);
         // execlp only returns on failure (e.g. emulator not installed);
         // fall through and try the next one.
     }
