@@ -4,14 +4,6 @@
 #include "config.h"
 #include "SDL_net.h"
 
-/* ntohl() for the CONVIP macro below. SDL_net pulls in the right networking
-   header transitively on most platforms, but IRIX's (Nekoware) SDL_net does
-   not, so include it explicitly. On Windows ntohl lives in winsock2.h, which
-   SDL_net already includes there. */
-#ifndef _WIN32
-#include <arpa/inet.h>
-#endif
-
 struct packetBuffer {
 	Bit8u buffer[1024];
 	Bit16s packetSize;  // Packet size remaining in read
@@ -38,14 +30,17 @@ struct packetBuffer {
 
 #define SOCKETTABLESIZE 256
 /* SDL_net's IPaddress.host is in network byte order. Extracting the octets by
-   raw shifts (low byte first) only prints them in the right order on a
-   little-endian host; on big-endian (PowerPC) it reversed them
-   (100.1.168.192 instead of 192.168.1.100). ntohl() normalises to host order
-   on every platform, so >>24 is always the first octet. Logging only. */
-#define CONVIP(hostvar) (int)((ntohl(hostvar) >> 24) & 0xff), \
-                        (int)((ntohl(hostvar) >> 16) & 0xff), \
-                        (int)((ntohl(hostvar) >>  8) & 0xff), \
-                        (int)( ntohl(hostvar)        & 0xff)
+   raw shifts (low byte first) only printed them in the right order on a
+   little-endian host; on big-endian (PowerPC) it reversed them (100.1.168.192
+   instead of 192.168.1.100). Read the bytes straight out of the network-order
+   value instead: byte 0 is always the first octet, on every endianness -- and,
+   unlike ntohl(), this needs no winsock/arpa header or ws2_32 link (ntohl was
+   an unresolved external on the MSVC/mingw Windows builds). hostvar must be an
+   lvalue; every call site passes one. Logging only. */
+#define CONVIP(hostvar) ((const unsigned char *)&(hostvar))[0], \
+                        ((const unsigned char *)&(hostvar))[1], \
+                        ((const unsigned char *)&(hostvar))[2], \
+                        ((const unsigned char *)&(hostvar))[3]
 #define CONVIPX(hostvar) hostvar[0], hostvar[1], hostvar[2], hostvar[3], hostvar[4], hostvar[5]
 
 
