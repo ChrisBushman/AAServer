@@ -4,6 +4,14 @@
 #include "config.h"
 #include "SDL_net.h"
 
+/* ntohl() for the CONVIP macro below. SDL_net pulls in the right networking
+   header transitively on most platforms, but IRIX's (Nekoware) SDL_net does
+   not, so include it explicitly. On Windows ntohl lives in winsock2.h, which
+   SDL_net already includes there. */
+#ifndef _WIN32
+#include <arpa/inet.h>
+#endif
+
 struct packetBuffer {
 	Bit8u buffer[1024];
 	Bit16s packetSize;  // Packet size remaining in read
