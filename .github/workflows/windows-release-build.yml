@@ -1,6 +1,17 @@
 name: Windows release build
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish to (blank = build a CI artifact only)"
+        required: false
+      base_tag:
+        description: "Release to copy the curated -Windows.zip from before swapping in the fresh exe (e.g. v1.2.2); blank = latest"
+        required: false
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -23,3 +34,22 @@ jobs:
           name: AAServer-windows
           path: AAServer/Release/AAServer.exe
           if-no-files-found: error
+
+      - name: Swap fresh exe into curated -Windows.zip and publish
+        if: ${{ inputs.tag != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset="AAServer-Windows.zip"
+          if [ -n "${{ inputs.base_tag }}" ]; then
+            gh release download "${{ inputs.base_tag }}" -p "$asset" --clobber
+          else
+            gh release download -p "$asset" --clobber
+          fi
+          rm -rf "AAServer-Windows"
+          unzip -q "$asset"
+          cp "AAServer/Release/AAServer.exe" "AAServer-Windows/AAServer.exe"
+          rm -f "$asset"
+          zip -rqy "$asset" "AAServer-Windows"
+          gh release upload "${{ inputs.tag }}" "$asset" --clobber
