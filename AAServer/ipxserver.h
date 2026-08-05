@@ -29,7 +29,15 @@ struct packetBuffer {
 #define DISCOVERY_REPLY_PREFIX   "AASERVER_HERE:"
 
 #define SOCKETTABLESIZE 256
-#define CONVIP(hostvar) hostvar & 0xff, (hostvar >> 8) & 0xff, (hostvar >> 16) & 0xff, (hostvar >> 24) & 0xff
+/* SDL_net's IPaddress.host is in network byte order. Extracting the octets by
+   raw shifts (low byte first) only prints them in the right order on a
+   little-endian host; on big-endian (PowerPC) it reversed them
+   (100.1.168.192 instead of 192.168.1.100). ntohl() normalises to host order
+   on every platform, so >>24 is always the first octet. Logging only. */
+#define CONVIP(hostvar) (int)((ntohl(hostvar) >> 24) & 0xff), \
+                        (int)((ntohl(hostvar) >> 16) & 0xff), \
+                        (int)((ntohl(hostvar) >>  8) & 0xff), \
+                        (int)( ntohl(hostvar)        & 0xff)
 #define CONVIPX(hostvar) hostvar[0], hostvar[1], hostvar[2], hostvar[3], hostvar[4], hostvar[5]
 
 

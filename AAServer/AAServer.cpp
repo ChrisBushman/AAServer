@@ -281,9 +281,14 @@ static void IPX_ServerLoop()
                     if (connBuffer[i].connected
                             && (ipconn[i].host == inPacket.address.host)
                             && (ipconn[i].port == inPacket.address.port)) {
-                        LOG_MSG("IPXSERVER: Reconnect from %d.%d.%d.%d:%d [%d]\n",
-                                CONVIP(inPacket.address.host), inPacket.address.port, i);
-                        fflush(stdout);
+                        /* This is the client's periodic keepalive (same
+                           registration packet as the initial connect), NOT an
+                           actual reconnect -- a connection that really dropped
+                           would have timed out of this slot and come back
+                           through the "Connect from" path below. Just refresh
+                           the timeout and re-ack; don't log, or every keepalive
+                           round-trip spams "Reconnect from ..." for the whole
+                           session. */
                         connBuffer[i].timeout = CONNECT_TIMEOUT;
                         ackClient(inPacket.address);
                         return;
