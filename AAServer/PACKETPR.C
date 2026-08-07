@@ -207,7 +207,7 @@ void PacketPrint(void *aData, unsigned int aSize)
 #else
     FILE *fp;
 
-    fp = fopen("packets.txt", "a");
+    fp = fopen("packets.txt", "ab");   /* "ab": classic Mac must not translate line endings */
     if (fp) {
         PacketFPrint(fp, aData, aSize);
         fclose(fp);

@@ -10,10 +10,17 @@
 /** If I'm on a unix box, grab some system typedefs as well. **/
 #ifdef TARGET_UNIX
 #  include <stdio.h>
-#  include <sys/types.h>
-#  include <strings.h>
-#  include <limits.h>
-#  include <unistd.h>
+#  if defined(macintosh)
+/* classic Mac (CodeWarrior MSL) has no sys/types.h / strings.h / unistd.h;
+   time_t lives in <time.h> here. */
+#    include <time.h>
+#    include <limits.h>
+#  else
+#    include <sys/types.h>
+#    include <strings.h>
+#    include <limits.h>
+#    include <unistd.h>
+#  endif
 
 typedef time_t T_time;
 

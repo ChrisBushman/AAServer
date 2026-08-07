@@ -1,9 +1,11 @@
 #ifndef _AASERVER_CONFIG_H_
 #define _AASERVER_CONFIG_H_
 
-#ifdef TARGET_UNIX
+#if defined(TARGET_UNIX) && !defined(__MWERKS__)
 #define GCC_ATTRIBUTE(x) __attribute__((x))
 #else
+/* CodeWarrior (classic Mac) has no __attribute__; the ipx.h wire structs it
+   tags are packed via #pragma options align=packed there instead. */
 #define GCC_ATTRIBUTE(x) /* attribute not supported */
 #endif
 #define GCC_UNLIKELY(x) (x)

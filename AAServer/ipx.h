@@ -74,6 +74,13 @@
 #include "SDL_net.h"
 #endif
 
+/* CodeWarrior: GCC_ATTRIBUTE(packed) is empty (config.h), so pack these IPX
+   wire structs explicitly. Reset before fragmentDescriptor/ECBClass (runtime
+   types that must keep natural alignment). */
+#if defined(__MWERKS__)
+#pragma options align=packed
+#endif
+
 struct PackedIP {
 	Uint32 host;
 	Uint16 port;
@@ -112,6 +119,10 @@ struct IPXHeader {
 	   dropped. */
 	Uint32 counter;
 } GCC_ATTRIBUTE(packed);
+
+#if defined(__MWERKS__)
+#pragma options align=reset
+#endif
 
 struct fragmentDescriptor {
 	Bit16u offset;

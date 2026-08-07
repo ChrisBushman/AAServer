@@ -8,6 +8,14 @@
 #include "GROUP.H"
 // VIEWFILE.H intentionally not vendored -- PACKET.H uses nothing from it (verified: PACKET.H compiles standalone without it). See mac/README.md.
 
+/* CodeWarrior has no per-field packed attribute, so PACK (GENERAL.H) is empty
+   there and these on-the-wire packet structs would get PPC natural alignment
+   (padding) and mismatch every other platform's client. Pack the whole
+   wire-struct region instead. Reset at end of file. */
+#if defined(__MWERKS__)
+#pragma options align=packed
+#endif
+
 /* ------------------------------------------------------------------------ */
 
 #define SHORT_PACKET_LENGTH 10
@@ -200,6 +208,10 @@ typedef struct {
 	T_byte8 commandBeingAcked      PACK;
 	T_word32 packetIDBeingAcked    PACK;
 } T_ackPacket;
+
+#if defined(__MWERKS__)
+#pragma options align=reset
+#endif
 
 #endif
 

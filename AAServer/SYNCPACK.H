@@ -7,6 +7,12 @@
 
 #include "GENERAL.H"
 
+/* CodeWarrior: PACK (GENERAL.H) is empty, so pack the wire struct below
+   explicitly (see PACKET.H). Reset at end of file. */
+#if defined(__MWERKS__)
+#pragma options align=packed
+#endif
+
 typedef T_byte8 T_syncPacketFieldsAvail ;
 #define SYNC_PACKET_FIELD_AVAIL_X    0x01      /* ---- ---1 */
 #define SYNC_PACKET_FIELD_AVAIL_Y    0x02      /* ---- --1- */
@@ -105,6 +111,10 @@ typedef struct {
     T_word16 nextObjectIdWhen                    PACK ;
 #endif
 } T_syncronizePacket ;
+
+#if defined(__MWERKS__)
+#pragma options align=reset
+#endif
 
 #endif
 

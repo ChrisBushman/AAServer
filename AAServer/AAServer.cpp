@@ -3,7 +3,11 @@
 
 #ifdef TARGET_UNIX
 #include <stdio.h>
-#include <unistd.h>
+#if !defined(macintosh)
+#include <unistd.h>   /* classic Mac OS (SIOUX) has no unistd.h; only the
+                         Unix terminal-relaunch code below needs it, and
+                         that is guarded out for macintosh */
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -26,6 +30,12 @@
 #include <SDL2/SDL.h>
 #else
 #include "SDL.h"
+#endif
+#if defined(macintosh)
+/* Classic SDL 1.2's SDL_main.h does `#define main SDL_main` so an SDLMain
+   shim can own the Mac app's entry point. AAServer is a headless SIOUX
+   console server with no SDLMain, so keep our own main() as the entry. */
+#undef main
 #endif
 extern "C" {
 void PacketPrint(void *aData, unsigned int aSize);
@@ -447,7 +457,11 @@ bool IPX_StartServer(Bit16u portnum)
     return false;
 }
 
-#ifdef TARGET_UNIX
+/* The terminal-relaunch machinery below (ResolveExecutablePath via
+   readlink("/proc/self/exe")/_NSGetExecutablePath, SpawnInTerminal) is
+   Unix/OS-X-only and has no classic-Mac equivalent -- a SIOUX console app
+   already owns a console -- so it is compiled out for macintosh. */
+#if defined(TARGET_UNIX) && !defined(macintosh)
 /* Guard env var: set on the relaunched copy before it execs into a
    terminal, so that copy (which still sees --console, if the caller left
    it in) never tries to relaunch itself again. */
@@ -608,6 +622,7 @@ int _tmain(int argc, _TCHAR* argv[])
         }
         argc = w;
     }
+#if !defined(macintosh)
     if (consoleRequested && !getenv(CONSOLE_SPAWNED_ENV)) {
         if (SpawnInTerminal(argc, argv))
             return 0; // unreachable: SpawnInTerminal execs on success
@@ -617,6 +632,10 @@ int _tmain(int argc, _TCHAR* argv[])
     /* Identify the window/tab for whoever's looking at the process list
        or a pile of terminal windows, regardless of how it got a tty. */
     printf("\033]0;AAServer - Amulets & Armor Dedicated Server\007");
+#else
+    /* classic Mac: SIOUX already is the console; nothing to spawn. */
+    (void)consoleRequested;
+#endif
 #else
     /* Accept and ignore --console here too, so callers (e.g. AALauncher)
        can pass it unconditionally across platforms -- the native Windows
