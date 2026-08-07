@@ -36,6 +36,8 @@
    shim can own the Mac app's entry point. AAServer is a headless SIOUX
    console server with no SDLMain, so keep our own main() as the entry. */
 #undef main
+#include <SIOUX.h>              /* SIOUXHandleOneEvent -- pump SIOUX's event loop */
+extern "C" Boolean SIOUXQuitting;   /* SIOUXGlobals.h: set on File>Quit / Cmd-Q */
 #endif
 extern "C" {
 void PacketPrint(void *aData, unsigned int aSize);
@@ -447,6 +449,23 @@ bool IPX_StartServer(Bit16u portnum)
                 // 1 second has gone by
                 UpdateConnections();
             }
+#if defined(macintosh)
+            /* Yield to SIOUX each pass so its menu bar stays painted, the Mac
+               stays responsive under classic-Mac cooperative multitasking, and
+               the user can stop the server via SIOUX's File>Quit / Cmd-Q.
+               Non-blocking (WaitNextEvent sleep=0) so packet handling isn't
+               stalled. */
+            {
+                EventRecord macEvent;
+                if (WaitNextEvent(everyEvent, &macEvent, 0L, NULL))
+                    SIOUXHandleOneEvent(&macEvent);
+                if (SIOUXQuitting) {
+                    SDLNet_Quit();
+                    SDL_Quit();
+                    return true;
+                }
+            }
+#endif
             SDL_Delay(1);
         }
 
